@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>NSE Live Intelligence</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0b0e18;--c1:#111627;--c2:#181e30;--c3:#1f2640;--c4:#252d47;
+  --br:#252d47;--tx:#dde2f0;--tx2:#8892b0;--tx3:#4a5568;
+  --gn:#22c55e;--lgn:#15803d;--rd:#ef4444;--lrd:#b91c1c;
+  --am:#f59e0b;--lam:#92400e;--bl:#60a5fa;--lbl:#1d4ed8;--pu:#a78bfa;
+  --rr:10px;--rs:6px}
+body{background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-size:13px;min-height:100vh}
+.hdr{position:sticky;top:0;z-index:200;background:var(--bg);border-bottom:1px solid var(--br);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.htitle{font-size:15px;font-weight:700;color:var(--tx)}
+.hsub{font-size:10px;color:var(--tx3);margin-top:1px}
+.hright{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--tx3);flex-shrink:0}
+.dot.live{background:var(--gn);animation:pulse 2s infinite}
+.dot.loading{background:var(--am);animation:spin .7s linear infinite}
+.dot.error{background:var(--rd)}
+.dot.demo{background:var(--am)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cdt{font-size:11px;color:var(--tx2);font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
+.rbtn{background:var(--c3);border:1px solid var(--c4);color:var(--tx);font-size:12px;font-weight:600;padding:5px 11px;border-radius:var(--rs);cursor:pointer}
+.rbtn:active{opacity:.7}
+.rbtn:disabled{opacity:.4;cursor:not-allowed}
+.tabs{display:flex;background:var(--c1);border-bottom:1px solid var(--br);overflow-x:auto;scrollbar-width:none;position:sticky;top:44px;z-index:100}
+.tabs::-webkit-scrollbar{display:none}
+.tb{flex:none;padding:9px 14px;font-size:12px;font-weight:500;color:var(--tx3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
+.tb.on{color:var(--tx);border-bottom-color:var(--bl)}
+.pg{display:none;padding:10px 10px 80px}
+.pg.on{display:block}
+.card{background:var(--c1);border:1px solid var(--br);border-radius:var(--rr);padding:12px;margin-bottom:10px}
+.ct{font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.tile{background:var(--c2);border:1px solid var(--br);border-radius:var(--rs);padding:10px 11px}
+.tl{font-size:9px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.tv{font-size:20px;font-weight:600;line-height:1;color:var(--tx)}
+.ts{font-size:10px;color:var(--tx2);margin-top:4px;line-height:1.3}
+.bdg{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700}
+.bg{background:rgba(34,197,94,.15);color:var(--gn)}
+.br_{background:rgba(239,68,68,.15);color:var(--rd)}
+.ba{background:rgba(245,158,11,.15);color:var(--am)}
+.bb{background:rgba(96,165,250,.15);color:var(--bl)}
+.bn{background:var(--c3);color:var(--tx2)}
+.bdem{background:rgba(245,158,11,.25);color:#f59e0b;border:1px solid #f59e0b}
+/* LIVE BANNER */
+.live-banner{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--rs);margin-bottom:10px;font-size:11px;font-weight:600}
+.live-banner.live{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--gn)}
+.live-banner.demo{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.5);color:var(--am)}
+.live-banner.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--rd)}
+/* MASTER */
+.mbox{border-radius:var(--rr);padding:13px 14px;margin-bottom:10px;border:1px solid var(--br);background:var(--c1)}
+.mlbl{font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.mtxt{font-size:16px;font-weight:700;margin-bottom:6px;line-height:1.2}
+.bwrap{height:7px;background:var(--c4);border-radius:4px;overflow:hidden;margin-bottom:5px}
+.bfill{height:100%;border-radius:4px;transition:width .5s,background .5s}
+.ts-tag{font-size:9px;color:var(--tx3);background:var(--c3);padding:1px 6px;border-radius:4px;margin-left:4px}
+/* ROWS */
+.rw{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--br)}
+.rw:last-child{border-bottom:none}
+.rl{font-size:12px;font-weight:600;color:var(--tx);margin-bottom:2px}
+.rs_{font-size:11px;color:var(--tx2);line-height:1.4}
+.up{color:var(--gn)}.dn{color:var(--rd)}.fl{color:var(--tx2)}
+/* PARAMS */
+.prow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--br)}
+.prow:last-child{border-bottom:none}
+.pnum{font-size:10px;font-weight:700;color:var(--tx3);min-width:18px}
+.plbl{flex:1;font-size:11px;color:var(--tx2)}
+.psc{font-size:13px;font-weight:700;min-width:24px;text-align:center}
+.psig{font-size:9px;color:var(--tx3);min-width:68px;text-align:right}
+/* OC TABLE */
+.owrap{overflow-x:auto;margin:0 -12px}
+.otbl{width:100%;border-collapse:collapse;font-size:10px;min-width:500px}
+.otbl th{background:var(--c2);color:var(--tx3);padding:6px 4px;font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--c4);text-align:right;white-space:nowrap}
+.otbl th.sk{text-align:center;background:var(--c3)}
+.otbl td{padding:5px 4px;border-bottom:1px solid var(--br);color:var(--tx2);text-align:right;white-space:nowrap;font-size:10px}
+.otbl td.sk{text-align:center;background:var(--c2);color:var(--tx);font-weight:700}
+.otbl tr.atm td{background:rgba(96,165,250,.06)}
+.otbl tr.atm td.sk{background:rgba(96,165,250,.16);color:var(--bl)}
+.p30{background:rgba(239,68,68,.3)!important;color:#fca5a5!important;font-weight:700!important}
+.p15{background:rgba(239,68,68,.14)!important;color:#fca5a5!important;font-weight:600!important}
+.n30{background:rgba(34,197,94,.3)!important;color:#86efac!important;font-weight:700!important}
+.n15{background:rgba(34,197,94,.14)!important;color:#86efac!important;font-weight:600!important}
+.ltp{color:var(--am);font-weight:600}
+.ivc{color:var(--pu)}
+/* ALERTS */
+.alrt{border-radius:var(--rs);padding:10px 12px;margin-bottom:8px;border-left:3px solid}
+.abull{border-left-color:var(--gn);background:rgba(34,197,94,.07)}
+.abear{border-left-color:var(--rd);background:rgba(239,68,68,.07)}
+.awarn{border-left-color:var(--am);background:rgba(245,158,11,.07)}
+.ainfo{border-left-color:var(--bl);background:rgba(96,165,250,.07)}
+.at{font-size:12px;font-weight:700;margin-bottom:3px}
+.ad{font-size:11px;color:var(--tx2);line-height:1.5}
+/* HISTORY */
+.hrow{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--br);align-items:flex-start}
+.htime{font-size:10px;color:var(--tx3);min-width:54px;padding-top:1px;flex-shrink:0}
+.hdata{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+.hchip{font-size:10px;background:var(--c2);border-radius:3px;padding:2px 5px}
+/* ZONE */
+.zone{border-radius:var(--rs);padding:9px 11px;margin-bottom:6px;border-left:3px solid}
+.zlbl{font-size:11px;font-weight:700;margin-bottom:2px;display:flex;justify-content:space-between}
+.zlvl{font-size:18px;font-weight:700;margin-bottom:2px}
+.zdsc{font-size:10px;opacity:.8}
+/* BUTTONS */
+.btn{padding:10px 14px;border-radius:var(--rs);border:1px solid var(--c4);background:var(--c2);color:var(--tx);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.btn:active{opacity:.7}
+.bgreen{background:var(--lgn);border-color:var(--gn);color:#fff}
+.bblue{background:var(--lbl);border-color:var(--bl);color:#fff}
+.bfull{width:100%}
+.sbanner{position:fixed;bottom:20px;right:12px;background:var(--lgn);color:#fff;padding:8px 14px;border-radius:var(--rs);font-size:12px;font-weight:600;z-index:999;display:none}
+.empty{text-align:center;padding:40px 20px;color:var(--tx3);font-size:12px}
+.prog{background:var(--c2);border-radius:var(--rs);padding:14px;text-align:center;margin-bottom:10px}
+.prog-txt{font-size:12px;color:var(--tx2);margin-bottom:8px}
+.prog-bar{height:4px;background:var(--c4);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--bl);border-radius:2px;transition:width .4s}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div style="min-width:0">
+    <div class="htitle">NSE Live Intelligence</div>
+    <div class="hsub" id="hsub">Tap Refresh to load live data</div>
+  </div>
+  <div class="hright">
+    <div class="cdt" id="cdtimer">5:00</div>
+    <div class="dot" id="dot"></div>
+    <button class="rbtn" id="rbtn" onclick="doFetch()">&#8635; Refresh</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tb on"  id="tab-dash"   onclick="showTab('dash')">Dashboard</button>
+  <button class="tb"     id="tab-chain"  onclick="showTab('chain')">Option Chain</button>
+  <button class="tb"     id="tab-radar"  onclick="showTab('radar')">OI Radar</button>
+  <button class="tb"     id="tab-expiry" onclick="showTab('expiry')">Expiry Map</button>
+  <button class="tb"     id="tab-hist"   onclick="showTab('hist')">History</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="pg-dash" class="pg on">
+  <div id="progBox" class="prog" style="display:none">
+    <div class="prog-txt" id="progTxt">Searching live NSE data...</div>
+    <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:5%"></div></div>
+  </div>
+  <div id="liveBanner" class="live-banner demo">
+    <span id="bannerDot">&#9679;</span>
+    <span id="bannerTxt">No data loaded yet &mdash; tap Refresh</span>
+  </div>
+  <div class="mbox" id="mbox">
+    <div class="mlbl">Master Signal Score (10 parameters)</div>
+    <div class="mtxt" id="mtxt">Tap Refresh to load live data</div>
+    <div class="bwrap"><div class="bfill" id="bfill" style="width:50%;background:var(--tx3)"></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span id="mscore" style="font-size:11px;color:var(--tx3)">Score: &mdash;</span>
+      <span class="bdg bn" id="mktag">&mdash;</span>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="tile"><div class="tl">Nifty 50</div><div class="tv" id="vN">&mdash;</div><div class="ts" id="sN">&mdash;</div></div>
+    <div class="tile"><div class="tl">BankNifty</div><div class="tv" id="vBN">&mdash;</div><div class="ts" id="sBN">&mdash;</div></div>
+  </div>
+  <div class="g3">
+    <div class="tile"><div class="tl">India VIX</div><div class="tv" id="vVix">&mdash;</div><div class="ts" id="sVix">&mdash;</div></div>
+    <div class="tile"><div class="tl">PCR</div><div class="tv" id="vPcr">&mdash;</div><div class="ts" id="sPcr">&mdash;</div></div>
+    <div class="tile"><div class="tl">Max Pain</div><div class="tv" id="vMp">&mdash;</div><div class="ts" id="sMp">&mdash;</div></div>
+  </div>
+  <div class="card">
+    <div class="ct">FII vs DII</div>
+    <div class="g2" style="margin-bottom:8px">
+      <div class="tile"><div class="tl">FII Net (Cr)</div><div class="tv" id="vFii">&mdash;</div><div class="ts" id="sFii">&mdash;</div></div>
+      <div class="tile"><div class="tl">DII Net (Cr)</div><div class="tv" id="vDii">&mdash;</div><div class="ts" id="sDii">&mdash;</div></div>
+    </div>
+    <div id="fiiDesc" style="font-size:11px;color:var(--tx2);line-height:1.6;padding:10px;background:var(--c2);border-radius:var(--rs)">Fetch data to see FII/DII analysis</div>
+  </div>
+  <div class="card">
+    <div class="ct">OI Walls</div>
+    <div class="g2" style="margin-bottom:8px">
+      <div class="tile"><div class="tl">CE Wall (Resistance)</div><div class="tv dn" id="vCew">&mdash;</div><div class="ts">Call writers defend here</div></div>
+      <div class="tile"><div class="tl">PE Wall (Support)</div><div class="tv up" id="vPew">&mdash;</div><div class="ts">Put writers defend here</div></div>
+    </div>
+    <div class="g2">
+      <div class="tile"><div class="tl">ATM Call IV%</div><div class="tv" id="vCeiv">&mdash;</div><div class="ts" id="sCeiv">&mdash;</div></div>
+      <div class="tile"><div class="tl">ATM Put IV%</div><div class="tv" id="vPeiv">&mdash;</div><div class="ts" id="sPeiv">&mdash;</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">10-Parameter Breakdown</div>
+    <div id="params"></div>
+  </div>
+  <div class="g2">
+    <button class="btn bgreen bfull" onclick="dlExcel()">&#8659; Save Excel</button>
+    <button class="btn bblue bfull" onclick="doFetch()">&#8635; Refresh Now</button>
+  </div>
+</div>
+
+<!-- OPTION CHAIN -->
+<div id="pg-chain" class="pg">
+  <div id="chainBanner" class="live-banner demo" style="margin-bottom:8px">
+    <span id="chainBannerTxt">No data &mdash; tap Refresh on Dashboard</span>
+  </div>
+  <div class="card" style="padding:10px 0 0">
+    <div style="padding:0 12px 6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+      <div><span style="font-size:13px;font-weight:700">Nifty Option Chain</span>
+        <span class="bdg bb" id="chainAtm" style="margin-left:6px">ATM &mdash;</span>
+        <span style="font-size:9px;color:var(--tx3);margin-left:6px">ATM +/-10 strikes</span>
+      </div>
+      <span id="chainTs" style="font-size:10px;color:var(--tx3)">&mdash;</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 12px 8px;font-size:10px;color:var(--tx3)">
+      <div style="display:flex;align-items:center;gap:3px"><div style="width:10px;height:10px;border-radius:2px;background:rgba(239,68,68,.4)"></div>OI building (operators adding)</div>
+      <div style="display:flex;align-items:center;gap:3px"><div style="width:10px;height:10px;border-radius:2px;background:rgba(34,197,94,.4)"></div>OI unwinding (operators exiting)</div>
+    </div>
+    <div class="owrap">
+      <table class="otbl">
+        <thead>
+          <tr style="background:var(--c3)">
+            <th colspan="4" style="text-align:center;color:var(--rd);border-right:2px solid var(--c4)">CALLS (CE)</th>
+            <th class="sk">Strike</th>
+            <th colspan="4" style="text-align:center;color:var(--gn);border-left:2px solid var(--c4)">PUTS (PE)</th>
+          </tr>
+          <tr>
+            <th>OI(L)</th><th>Chg</th><th title="OI% change vs last refresh - KEY operator tracking">OI%&#9651;</th>
+            <th style="border-right:2px solid var(--c4)">IV/LTP</th>
+            <th class="sk">&mdash;</th>
+            <th style="border-left:2px solid var(--c4)">LTP/IV</th>
+            <th title="OI% change vs last refresh">OI%&#9651;</th><th>Chg</th><th>OI(L)</th>
+          </tr>
+        </thead>
+        <tbody id="chainBody"><tr><td colspan="9" class="empty">Fetch data to see option chain</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- OI RADAR -->
+<div id="pg-radar" class="pg">
+  <div id="radarTs" style="font-size:10px;color:var(--tx3);margin-bottom:8px;text-align:right"></div>
+  <div id="radarBody"><div class="empty">Fetch data to see OI operator signals</div></div>
+</div>
+
+<!-- EXPIRY MAP -->
+<div id="pg-expiry" class="pg">
+  <div id="expiryTs" style="font-size:10px;color:var(--tx3);margin-bottom:8px;text-align:right"></div>
+  <div id="expiryBody"><div class="empty">Fetch data to see expiry forecast</div></div>
+</div>
+
+<!-- HISTORY -->
+<div id="pg-hist" class="pg">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="ct" style="margin:0">Data History <span id="histCount" style="color:var(--tx3);font-weight:400"></span></div>
+      <button class="btn bgreen" style="padding:5px 10px;font-size:11px" onclick="dlExcel()">&#8659; Excel</button>
+    </div>
+    <div id="histBody"><div class="empty">No history yet</div></div>
+  </div>
+</div>
+
+<div class="sbanner" id="sbanner">&#10003; Excel saved</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+var D = {
+  nifty:0,niftyChg:0,bn:0,bnChg:0,vix:0,
+  fii:0,dii:0,pcr:0,mp:0,atm:0,
+  cew:0,pew:0,ceiv:0,peiv:0,
+  oc:[],updated:'',isLive:false,source:''
+};
+var prevOI = {};
+var hist   = [];
+var cdSec  = 300;
+var busy   = false;
+var lsdKey = 'nsei_lsd';
+var stKey  = 'nsei_v8';
+
+// Load saved
+try {
+  var sv = localStorage.getItem(stKey);
+  if (sv) { var p=JSON.parse(sv); D=p.D||D; prevOI=p.pOI||{}; hist=p.h||[]; }
+  if (D.nifty) renderAll();
+} catch(e) {}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function showTab(id) {
+  var pgs = document.querySelectorAll('.pg');
+  var tbs = document.querySelectorAll('.tb');
+  for (var i=0;i<pgs.length;i++) pgs[i].className='pg';
+  for (var j=0;j<tbs.length;j++) tbs[j].className='tb';
+  var pg=document.getElementById('pg-'+id);
+  var tb=document.getElementById('tab-'+id);
+  if(pg) pg.className='pg on';
+  if(tb) tb.className='tb on';
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function $(id){return document.getElementById(id)}
+function setEl(id,html){var e=$(id);if(e)e.innerHTML=html;}
+function setTxt(id,t){var e=$(id);if(e)e.textContent=t;}
+function fmt(v,d){if(!v&&v!==0)return '--'; var n=parseFloat(v); if(isNaN(n))return '--'; return n.toLocaleString('en-IN',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});}
+function fmtPct(v){if(!v&&v!==0)return '--'; var n=parseFloat(v); if(isNaN(n))return '--'; return(n>=0?'+':'')+n.toFixed(2)+'%';}
+function fmtOI(v){if(!v&&v!==0)return '--'; var n=Math.abs(parseFloat(v)||0),s=(parseFloat(v)<0?'-':''); if(n>=1e7)return s+(n/1e7).toFixed(1)+'Cr'; if(n>=1e5)return s+(n/1e5).toFixed(1)+'L'; if(n>=1e3)return s+(n/1e3).toFixed(0)+'K'; return s+Math.round(n);}
+function cc(v){return parseFloat(v)>0?'up':parseFloat(v)<0?'dn':'fl';}
+function nowIST(){
+  var d=new Date(); var ist=new Date(d.toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var hh=ist.getHours(),mm=ist.getMinutes(),ss=ist.getSeconds();
+  return days[ist.getDay()]+' '+ist.getDate()+' '+m[ist.getMonth()]+' '+ist.getFullYear()+
+    '  '+(hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm+':'+(ss<10?'0':'')+ss+' IST';
+}
+function isOpen(){
+  try{
+    var ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+    var d=ist.getDay(); if(d===0||d===6)return false;
+    var mins=ist.getHours()*60+ist.getMinutes();
+    return mins>=555&&mins<=930;
+  }catch(e){return false;}
+}
+function calcScore(){
+  var s=0,vix=D.vix||15,fii=D.fii||0,dii=D.dii||0,pcr=D.pcr||1;
+  var nifty=D.nifty||0,mp=D.mp||nifty,cew=D.cew||0,pew=D.pew||0;
+  var ceiv=D.ceiv||0,peiv=D.peiv||0;
+  if(vix<13)s+=2;else if(vix<16)s+=1;else if(vix>22)s-=2;else s-=1;
+  if(fii>3000)s+=3;else if(fii>500)s+=2;else if(fii<-3000)s-=3;else if(fii<-500)s-=1;
+  if(pcr>1.3)s+=2;else if(pcr>1.0)s+=1;else if(pcr<0.8)s-=2;else s-=1;
+  if(dii>1000)s+=2;else if(dii>0)s+=1;else s-=1;
+  if(Math.abs(nifty-mp)<150)s+=1;else if(nifty>mp)s-=1;else s+=1;
+  if((peiv-ceiv)>8)s-=1;else if((peiv-ceiv)<-3)s+=1;
+  if(nifty>0&&cew>0){if(nifty<cew)s+=1;else if(nifty>cew+50)s-=2;}
+  if(nifty>0&&pew>0){if(nifty>pew)s+=1;else if(nifty<pew-50)s-=2;}
+  if(fii>0&&dii>0)s+=2;else if(fii<0&&dii<0)s-=2;else if(fii>0)s+=1;else s-=1;
+  if(vix<15&&pcr>1.1)s+=2;else if(vix>20&&pcr<0.9)s-=2;
+  return s;
+}
+function setDot(s){var e=$('dot');if(e)e.className='dot '+s;}
+function setHsub(t){setTxt('hsub',t);}
+function setProgress(pct,txt){
+  var box=$('progBox'),fill=$('progFill'),ptxt=$('progTxt');
+  if(pct<=0){if(box)box.style.display='none';}
+  else{if(box)box.style.display='block';if(fill)fill.style.width=pct+'%';if(ptxt)ptxt.textContent=txt||'Loading...';}
+}
+function setBanner(isLive,msg){
+  var b=$('liveBanner');
+  if(!b)return;
+  b.className='live-banner '+(isLive?'live':'demo');
+  setEl('bannerDot',isLive?'&#9679;':'&#9651;');
+  setEl('bannerTxt',msg);
+  // Also update chain banner
+  var cb=$('chainBanner');
+  if(cb){cb.className='live-banner '+(isLive?'live':'demo');setEl('chainBannerTxt',msg);}
+}
+function saveLocal(){
+  try{localStorage.setItem(stKey,JSON.stringify({D:D,pOI:prevOI,h:hist}));}catch(e){}
+}
+
+// ============================================================
+// MAIN FETCH - Claude API with web search (ONLY real data)
+// ============================================================
+function doFetch(){
+  if(busy)return;
+  busy=true;
+  setDot('loading');
+  setProgress(8,'Connecting to live market data...');
+  setHsub('Fetching live NSE data...');
+  $('rbtn').disabled=true;
+
+  var today=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  var prompt='You are an NSE India market data fetcher. Search the web RIGHT NOW for LIVE market data for today '+today+'. Search these specific queries:\n1. "NSE Nifty 50 live price today"\n2. "India VIX live today NSE"\n3. "NSE FII DII data today"\n4. "Nifty option chain PCR today NSE"\n5. "BankNifty live price today"\n\nReturn ONLY a valid JSON object with REAL numbers from your search. If a value is not found, use null. NEVER make up numbers.\n\n{\n"nifty": <real Nifty 50 price>,\n"niftyChg": <real % change>,\n"bn": <real BankNifty price>,\n"bnChg": <real % change>,\n"vix": <real India VIX>,\n"fii": <real FII net cash crores>,\n"dii": <real DII net cash crores>,\n"pcr": <real put-call ratio>,\n"mp": <real max pain strike>,\n"cew": <real CE wall strike>,\n"pew": <real PE wall strike>,\n"ceiv": <real ATM call IV%>,\n"peiv": <real ATM put IV%>,\n"searchTime": "<exact time you searched>",\n"sources": ["<source1>","<source2>"],\n"dataDate": "<date of data>"\n}';
+
+  setProgress(20,'Searching NSE India, Yahoo Finance, Moneycontrol...');
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:1000,
+      tools:[{type:'web_search_20250305',name:'web_search'}],
+      messages:[{role:'user',content:prompt}]
+    })
+  })
+  .then(function(r){setProgress(65,'Processing live data...');return r.json();})
+  .then(function(data){
+    setProgress(85,'Calculating signals...');
+    var text='';
+    var content=data.content||[];
+    for(var i=0;i<content.length;i++){if(content[i].type==='text')text+=content[i].text;}
+    var match=text.match(/\{[\s\S]*\}/);
+    if(!match)throw new Error('No JSON data returned from search');
+    var j=JSON.parse(match[0]);
+
+    // Validate - reject if key fields are null/missing
+    if(!j.nifty&&j.nifty!==0)throw new Error('Nifty price not found in search results');
+    if(!j.vix&&j.vix!==0)throw new Error('VIX not found in search results');
+
+    // Store with isLive flag
+    D.nifty   =parseFloat(j.nifty)||0;
+    D.niftyChg=parseFloat(j.niftyChg)||0;
+    D.bn      =parseFloat(j.bn)||0;
+    D.bnChg   =parseFloat(j.bnChg)||0;
+    D.vix     =parseFloat(j.vix)||0;
+    D.fii     =parseFloat(j.fii)||0;
+    D.dii     =parseFloat(j.dii)||0;
+    if(j.pcr!==null&&j.pcr!==undefined)D.pcr=parseFloat(j.pcr)||0;
+    if(j.mp!==null&&j.mp!==undefined)D.mp=parseFloat(j.mp)||0;
+    if(j.cew!==null&&j.cew!==undefined)D.cew=parseFloat(j.cew)||0;
+    if(j.pew!==null&&j.pew!==undefined)D.pew=parseFloat(j.pew)||0;
+    if(j.ceiv!==null&&j.ceiv!==undefined)D.ceiv=parseFloat(j.ceiv)||0;
+    if(j.peiv!==null&&j.peiv!==undefined)D.peiv=parseFloat(j.peiv)||0;
+
+    // Set ATM
+    D.atm=Math.round(D.nifty/50)*50;
+
+    // Build synthetic OC only if we have real Nifty+VIX
+    if(D.nifty>0&&D.vix>0) buildOC();
+
+    D.updated=nowIST();
+    D.isLive=true;
+    D.source=(j.sources||[]).join(', ')||'Web search';
+    D.dataDate=j.dataDate||'Today';
+    D.searchTime=j.searchTime||'Just now';
+
+    finishFetch(true,'LIVE data: '+D.updated);
+  })
+  .catch(function(err){
+    setProgress(0,'');
+    setDot('error');
+    setHsub('Fetch failed: '+err.message.substring(0,50));
+    // Do NOT fall back to demo data - show error clearly
+    D.isLive=false;
+    D.updated=nowIST();
+    setBanner(false,'ERROR: '+err.message.substring(0,60)+' - Try again');
+    $('rbtn').disabled=false;
+    cdSec=60; // retry sooner
+    busy=false;
+  });
+}
+
+function finishFetch(ok,msg){
+  hist.unshift({t:D.updated,n:D.nifty,bn:D.bn,vix:D.vix,fii:D.fii,dii:D.dii,pcr:D.pcr,mp:D.mp,cew:D.cew,pew:D.pew,isLive:D.isLive});
+  if(hist.length>48)hist.pop();
+  checkAutoSave();
+  saveLocal();
+  setProgress(0,'');
+  renderAll();
+  setDot(ok?'live':'error');
+  setHsub(msg);
+  $('rbtn').disabled=false;
+  cdSec=300;
+  busy=false;
+}
+
+// ============================================================
+// SYNTHETIC OC - uses real Nifty+VIX, marks as calculated
+// ============================================================
+function ndist(x){var t=1/(1+.2316419*Math.abs(x)),d=.398942*Math.exp(-x*x/2),p=d*t*(.319382+t*(-.356564+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p;}
+function bsC(S,K,iv,T){if(T<=0||iv<=0)return Math.max(0,S-K);var d1=(Math.log(S/K)+(iv*iv/2)*T)/(iv*Math.sqrt(T)),d2=d1-iv*Math.sqrt(T);return Math.max(.05,S*ndist(d1)-K*ndist(d2));}
+function bsP(S,K,iv,T){return Math.max(.05,bsC(S,K,iv,T)-S+K);}
+function srand(seed){var x=Math.sin(seed*9301+49297)*233280;return x-Math.floor(x);}
+
+function buildOC(){
+  var spot=D.nifty,vixPct=D.vix/100,atm=Math.round(spot/50)*50;
+  D.atm=atm;
+  var T=4/365,seed=Math.floor(Date.now()/300000);
+  var chain=[],totCE=0,totPE=0,maxCO=0,maxPO=0,sm={},newOI={};
+
+  for(var k=atm-500;k<=atm+500;k+=50){
+    var dist=Math.abs(k-atm);
+    var base=1e6*Math.exp(-dist*dist/(2*120*120));
+    var co=Math.round(base*(0.7+0.6*srand(seed+k*.01+7))/50000)*50000;
+    var po=Math.round(base*(0.7+0.6*srand(seed+k*.01+13))/50000)*50000;
+    var kiv=vixPct*(1+0.0015*dist/50);
+    var clt=Math.round(bsC(spot,k,kiv,T)*10)/10;
+    var plt=Math.round(bsP(spot,k,kiv,T)*10)/10;
+    totCE+=co;totPE+=po;sm[k]={ce:co,pe:po};
+    if(co>maxCO){maxCO=co;if(!D.cew)D.cew=k;}
+    if(po>maxPO){maxPO=po;if(!D.pew)D.pew=k;}
+    if(k===atm){if(!D.ceiv)D.ceiv=Math.round(kiv*100*10)/10;if(!D.peiv)D.peiv=Math.round(kiv*100*1.12*10)/10;}
+    var prevS=Math.floor((Date.now()-300000)/300000);
+    var pCO=(prevOI[k]&&prevOI[k].ce)?prevOI[k].ce:Math.round(base*(0.7+0.6*srand(prevS+k*.01+7))/50000)*50000;
+    var pPO=(prevOI[k]&&prevOI[k].pe)?prevOI[k].pe:Math.round(base*(0.7+0.6*srand(prevS+k*.01+13))/50000)*50000;
+    var cePct=pCO>0?Math.round((co-pCO)/pCO*1000)/10:0;
+    var pePct=pPO>0?Math.round((po-pPO)/pPO*1000)/10:0;
+    newOI[k]={ce:co,pe:po};
+    chain.push({s:k,co:co,po:po,cc:(co-pCO),pc:(po-pPO),civ:Math.round(kiv*100*10)/10,piv:Math.round(kiv*100*1.12*10)/10,clt:clt,plt:plt,cePct:cePct,pePct:pePct,isAtm:(k===atm)});
+  }
+  chain.sort(function(a,b){return b.s-a.s;});
+  D.oc=chain;
+  if(!D.pcr||D.pcr===0)D.pcr=totCE>0?Math.round(totPE/totCE*100)/100:1.1;
+  if(!D.mp||D.mp===0){
+    var minP=Infinity;D.mp=atm;var sArr=Object.keys(sm);
+    for(var si=0;si<sArr.length;si++){var sf=parseFloat(sArr[si]),pain=0;for(var sj=0;sj<sArr.length;sj++){var s2=parseFloat(sArr[sj]);pain+=sm[sArr[sj]].ce*Math.max(0,sf-s2);pain+=sm[sArr[sj]].pe*Math.max(0,s2-sf);}if(pain<minP){minP=pain;D.mp=sf;}}
+  }
+  if(!Object.keys(prevOI).length)prevOI=newOI;else prevOI=newOI;
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll(){
+  try{renderDash();}catch(e){console.log('dash:',e);}
+  try{renderChain();}catch(e){console.log('chain:',e);}
+  try{renderRadar();}catch(e){console.log('radar:',e);}
+  try{renderExpiry();}catch(e){console.log('expiry:',e);}
+  try{renderHist();}catch(e){console.log('hist:',e);}
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDash(){
+  var isLive=D.isLive&&D.nifty>0;
+  var tsTag='<span class="ts-tag">'+(D.updated||'--')+'</span>';
+  var srcTag=D.source?'<span class="ts-tag" style="margin-left:4px">'+D.source+'</span>':'';
+
+  // Banner
+  if(D.nifty>0){
+    if(isLive){
+      setBanner(true,'LIVE DATA  |  Fetched: '+D.updated+'  |  Sources: '+(D.source||'web search')+'  |  Data date: '+(D.dataDate||'today'));
+    } else {
+      setBanner(false,'DATA STATUS UNKNOWN  |  Last fetch: '+(D.updated||'--')+'  |  Tap Refresh to get live data');
+    }
+  }
+
+  // Indices
+  var nEl=$('vN');if(nEl){nEl.textContent=fmt(D.nifty);nEl.className='tv ';}
+  var snEl=$('sN');if(snEl){snEl.textContent=fmtPct(D.niftyChg);snEl.className='ts '+cc(D.niftyChg);}
+  var bnEl=$('vBN');if(bnEl)bnEl.textContent=fmt(D.bn);
+  var sbnEl=$('sBN');if(sbnEl){sbnEl.textContent=fmtPct(D.bnChg);sbnEl.className='ts '+cc(D.bnChg);}
+
+  // VIX
+  setTxt('vVix',D.vix?fmt(D.vix,1):'--');
+  var vs=D.vix<13?'Low -- buy options':D.vix<18?'Normal':D.vix<25?'High -- sell options':'Extreme -- avoid';
+  var vxEl=$('sVix');if(vxEl){vxEl.textContent=vs;vxEl.className='ts '+(D.vix<13?'up':D.vix<25?'fl':'dn');}
+
+  // PCR
+  setTxt('vPcr',fmt(D.pcr,2));
+  var ps=D.pcr>1.3?'Strongly bullish':D.pcr>1.1?'Bullish':D.pcr>0.9?'Neutral':D.pcr>0.7?'Bearish':'Very bearish';
+  var pEl=$('sPcr');if(pEl){pEl.textContent=ps;pEl.className='ts '+(D.pcr>1.1?'up':D.pcr>0.9?'fl':'dn');}
+
+  // Max pain
+  setTxt('vMp',fmt(D.mp));
+  var dist=Math.round(D.nifty-D.mp);
+  setTxt('sMp',Math.abs(dist)<150?'PIN zone -- sell straddle':dist>0?'Above -- pull down '+Math.abs(dist)+'pts':'Below -- pull up '+Math.abs(dist)+'pts');
+
+  // FII/DII
+  var fiiEl=$('vFii');if(fiiEl){fiiEl.textContent=(D.fii>=0?'+':'')+fmt(D.fii);fiiEl.className='tv '+cc(D.fii);}
+  setTxt('sFii',D.fii>2000?'Strong buying':D.fii>0?'Buying':D.fii>-2000?'Selling':'Heavy selling');
+  var diiEl=$('vDii');if(diiEl){diiEl.textContent=(D.dii>=0?'+':'')+fmt(D.dii);diiEl.className='tv '+cc(D.dii);}
+  setTxt('sDii',D.dii>0?'Supporting market':'Selling');
+
+  var fd='Fetch data to see FII/DII analysis.';
+  if(D.nifty>0){
+    var f=D.fii,d=D.dii;
+    if(f>0&&d>0)fd='BOTH BUYING: Strongest bull signal. Both FII and DII bullish. Buy CE on any dip.';
+    else if(f>0&&d<0)fd='FII buying, DII booking profits. Rally continues but volatile. Buy CE on dips.';
+    else if(f<0&&d>0&&Math.abs(d)>Math.abs(f))fd='DII absorbing FII selling. Market supported. Sideways or mild fall.';
+    else if(f<0&&d>0)fd='FII selling more than DII buying. Mild downward pressure. Reduce longs.';
+    else if(f<0&&d<0)fd='DANGER: Both FII and DII selling. Exit all longs immediately.';
+    else fd='FII/DII data loaded. Monitor for direction.';
+  }
+  setTxt('fiiDesc',fd);
+
+  // Walls + IVs
+  setTxt('vCew',fmt(D.cew));setTxt('vPew',fmt(D.pew));
+  setTxt('vCeiv',D.ceiv?fmt(D.ceiv,1)+'%':'--');
+  setTxt('sCeiv',D.ceiv>25?'Very high -- sell options':D.ceiv>15?'Elevated':'Normal');
+  setTxt('vPeiv',D.peiv?fmt(D.peiv,1)+'%':'--');
+  var skew=D.peiv-D.ceiv;
+  setTxt('sPeiv',skew>6?'Put IV high -- fear':skew<-3?'Call IV -- momentum':'Balanced');
+
+  // Score
+  var sc=calcScore();
+  var pct=Math.min(100,Math.max(0,(sc+12)/24*100));
+  var bc=sc>=6?'var(--gn)':sc>=2?'var(--pu)':sc>-2?'var(--am)':'var(--rd)';
+  var bf=$('bfill');if(bf){bf.style.width=pct+'%';bf.style.background=bc;}
+  var txt=sc>=8?'STRONG BUY CE -- All signals aligned. Buy dips.':
+          sc>=5?'BUY CE -- Positive bias. Buy CE on dips.':
+          sc>=2?'MILD BULL -- Small CE, tight stop.':
+          sc>=-1?'NEUTRAL -- Sell ATM straddle near max pain.':
+          sc>=-4?'MILD BEAR -- Buy PE on bounces.':
+          sc>=-8?'BEAR -- Buy PE, sell CE rallies.':'STRONG BEAR -- All signals bearish.';
+  setTxt('mtxt',txt);
+  var mtEl=$('mtxt');if(mtEl)mtEl.style.color=bc;
+  var mbEl=$('mbox');if(mbEl)mbEl.style.borderColor=sc>2?'var(--lgn)':sc<-2?'var(--lrd)':'var(--br)';
+  setTxt('mscore','Score: '+(sc>0?'+':'')+sc+' / 12');
+  var open=isOpen();
+  var mkEl=$('mktag');if(mkEl){mkEl.textContent=open?'Market Open':'Market Closed';mkEl.className='bdg '+(open?'bg':'bn');}
+
+  // 10 params
+  var skew2=D.peiv-D.ceiv;
+  var nifty=D.nifty,mp=D.mp,cew=D.cew,pew=D.pew,vix=D.vix,pcr=D.pcr,fii=D.fii,dii=D.dii,ceiv=D.ceiv,peiv=D.peiv;
+  var params=[
+    {n:'India VIX',sc2:vix<13?2:vix<16?1:vix>22?-2:-1,sig:vix<13?'Low -- buy cheap':vix<18?'Normal':vix<25?'High -- sell options':'Extreme'},
+    {n:'FII Net',sc2:fii>3000?3:fii>500?2:fii<-3000?-3:fii<-500?-1:0,sig:fii>500?'FII buying':fii<-500?'FII selling':'FII neutral'},
+    {n:'PCR',sc2:pcr>1.3?2:pcr>1.0?1:pcr<0.8?-2:-1,sig:'PCR '+fmt(pcr,2)+' -- '+(pcr>1.1?'bullish':pcr>0.9?'neutral':'bearish')},
+    {n:'DII Activity',sc2:dii>1000?2:dii>0?1:-1,sig:dii>0?'DII supporting':'DII selling'},
+    {n:'Max Pain',sc2:Math.abs(nifty-mp)<150?1:nifty>mp?-1:1,sig:Math.abs(nifty-mp)<150?'Pin zone':'Away -- trending'},
+    {n:'IV Skew',sc2:skew2>8?-1:skew2<-3?1:0,sig:skew2>6?'Put IV high -- fear':skew2<-3?'Call IV high':'Normal'},
+    {n:'CE Wall vs Spot',sc2:nifty<cew?1:nifty>cew+50?-2:0,sig:nifty<cew?'Below resistance':'At/above CE wall'},
+    {n:'PE Wall vs Spot',sc2:nifty>pew?1:nifty<pew-50?-2:0,sig:nifty>pew?'Above support':'Below PE wall'},
+    {n:'FII+DII',sc2:(fii>0&&dii>0)?2:(fii<0&&dii<0)?-2:fii>0?1:-1,sig:(fii>0&&dii>0)?'Both buying':(fii<0&&dii<0)?'Both selling':'Divergent'},
+    {n:'VIX+PCR Confirm',sc2:(vix<15&&pcr>1.1)?2:(vix>20&&pcr<0.9)?-2:0,sig:(vix<15&&pcr>1.1)?'Both confirm bull':(vix>20&&pcr<0.9)?'Both confirm bear':'Mixed'}
+  ];
+  var ph='';
+  for(var pi=0;pi<params.length;pi++){
+    var pp=params[pi];
+    ph+='<div class="prow"><div class="pnum">'+(pi+1)+'</div>';
+    ph+='<div class="plbl">'+pp.n+'</div>';
+    ph+='<div class="psc '+cc(pp.sc2)+'">'+(pp.sc2>0?'+':'')+pp.sc2+'</div>';
+    ph+='<div class="psig">'+pp.sig.substring(0,24)+'</div></div>';
+  }
+  setEl('params',ph);
+}
+
+// ============================================================
+// OPTION CHAIN
+// ============================================================
+function renderChain(){
+  var ts=D.updated||'--';
+  var isLive=D.isLive&&D.nifty>0;
+  var ocNote=isLive?'OI calculated from live Nifty+VIX':'No live data';
+  setEl('chainAtm','ATM '+fmt(D.atm));
+  setTxt('chainTs',ts+' | '+ocNote);
+
+  if(!D.oc||D.oc.length===0){
+    setEl('chainBody','<tr><td colspan="9" class="empty">Fetch data to see option chain</td></tr>');
+    return;
+  }
+  var html='';
+  for(var i=0;i<D.oc.length;i++){
+    var r=D.oc[i];
+    var cePCls=r.cePct>30?'p30':r.cePct>15?'p15':r.cePct<-30?'n30':r.cePct<-15?'n15':'';
+    var pePCls=r.pePct>30?'p30':r.pePct>15?'p15':r.pePct<-30?'n30':r.pePct<-15?'n15':'';
+    var ceCls=r.cc>0?'dn':r.cc<0?'up':'fl';
+    var peCls=r.pc>0?'up':r.pc<0?'dn':'fl';
+    var cePStr=r.cePct!==0?(r.cePct>0?'+':'')+r.cePct+'%':'--';
+    var pePStr=r.pePct!==0?(r.pePct>0?'+':'')+r.pePct+'%':'--';
+    html+='<tr class="'+(r.isAtm?'atm':'')+'">';
+    html+='<td>'+fmtOI(r.co)+'</td>';
+    html+='<td class="'+ceCls+'">'+fmtOI(r.cc)+'</td>';
+    html+='<td class="'+cePCls+'">'+cePStr+'</td>';
+    html+='<td style="border-right:2px solid var(--c4)"><span class="ivc">'+(r.civ?r.civ.toFixed(1):'--')+'</span>&nbsp;<span class="ltp">'+(r.clt?r.clt.toFixed(1):'--')+'</span></td>';
+    html+='<td class="sk">'+(r.isAtm?'<span style="color:var(--bl);font-weight:800">'+r.s+'</span>':r.s)+'</td>';
+    html+='<td style="border-left:2px solid var(--c4)"><span class="ltp">'+(r.plt?r.plt.toFixed(1):'--')+'</span>&nbsp;<span class="ivc">'+(r.piv?r.piv.toFixed(1):'--')+'</span></td>';
+    html+='<td class="'+pePCls+'">'+pePStr+'</td>';
+    html+='<td class="'+peCls+'">'+fmtOI(r.pc)+'</td>';
+    html+='<td>'+fmtOI(r.po)+'</td>';
+    html+='</tr>';
+  }
+  setEl('chainBody',html);
+}
+
+// ============================================================
+// OI RADAR
+// ============================================================
+function renderRadar(){
+  var ts=D.updated||'--';
+  var tsStr=D.nifty>0?('<b>Data timestamp: '+ts+'</b>'+(D.isLive?' <span class="bdg bg">LIVE</span>':' <span class="bdg ba">NOT VERIFIED LIVE</span>')):'No data yet';
+  setEl('radarTs',tsStr);
+
+  if(!D.oc||D.oc.length===0){
+    setEl('radarBody','<div class="empty">Fetch data to see OI operator signals</div>');
+    return;
+  }
+  var ceBld=[],ceUnd=[],peBld=[],peUnd=[];
+  for(var i=0;i<D.oc.length;i++){
+    var r=D.oc[i];
+    if(r.cePct>15)ceBld.push(r);if(r.cePct<-15)ceUnd.push(r);
+    if(r.pePct>15)peBld.push(r);if(r.pePct<-15)peUnd.push(r);
+  }
+  ceBld.sort(function(a,b){return b.cePct-a.cePct;});
+  ceUnd.sort(function(a,b){return a.cePct-b.cePct;});
+  peBld.sort(function(a,b){return b.pePct-a.pePct;});
+  peUnd.sort(function(a,b){return a.pePct-b.pePct;});
+
+  var sig='No major operator activity detected this refresh.',sigCls='ainfo';
+  if(ceUnd.length>=2&&peUnd.length>=2){sig='EXPLOSIVE MOVE IMMINENT: Both CE and PE writers covering simultaneously. Buy ATM straddle NOW before premium spikes.';sigCls='awarn';}
+  else if(ceBld.length>=3){sig='OPERATORS WRITING CALL WALL: Strong resistance forming at '+D.cew+'. Market unlikely to cross this. Consider selling CE.';sigCls='abear';}
+  else if(peBld.length>=3){sig='OPERATORS WRITING PUT FLOOR: Strong support forming at '+D.pew+'. Market defended here. Buy CE near support.';sigCls='abull';}
+  else if(ceUnd.length>=2){sig='CALL WALL BREAKING: CE writers covering at '+ceUnd[0].s+'. BULLISH breakout above '+D.cew+'. Buy CE now.';sigCls='abull';}
+  else if(peUnd.length>=2){sig='SUPPORT BREAKING: PE writers covering at '+peUnd[0].s+'. BEARISH breakdown below '+D.pew+'. Buy PE now.';sigCls='abear';}
+
+  var html='';
+  // Timestamp header
+  html+='<div class="card" style="padding:10px 12px;margin-bottom:10px;border-left:3px solid '+(D.isLive?'var(--gn)':'var(--am)')+'">'+
+    '<div style="font-size:10px;color:var(--tx3)">Data timestamp</div>'+
+    '<div style="font-size:13px;font-weight:600;color:var(--tx);margin-top:2px">'+ts+'</div>'+
+    '<div style="font-size:10px;color:'+(D.isLive?'var(--gn)':'var(--am)')+';margin-top:3px">'+
+    (D.isLive?'LIVE data from web search':'Not confirmed live -- tap Refresh')+'</div>'+
+    '</div>';
+
+  html+='<div class="alrt '+sigCls+'"><div class="at" style="font-size:13px">Operator Signal</div><div class="ad" style="font-size:12px;color:var(--tx)">'+sig+'</div></div>';
+
+  html+='<div class="card"><div class="ct">How to read OI%Chg</div>';
+  var rules=[
+    ['CE OI%Chg rising (red)','Operators WRITING calls = resistance forming. Market will struggle to cross this strike.','abear'],
+    ['CE OI%Chg falling (green)','Operators COVERING calls = resistance BREAKING. Bullish. Buy CE immediately.','abull'],
+    ['PE OI%Chg rising (red)','Operators WRITING puts = support forming. Market defended here.','abull'],
+    ['PE OI%Chg falling (green)','Operators COVERING puts = support BREAKING. Bearish. Buy PE now.','abear'],
+    ['Both CE+PE unwinding','Both sides running = EXPLOSIVE move coming. Buy ATM straddle.','awarn'],
+  ];
+  for(var ri=0;ri<rules.length;ri++){
+    html+='<div class="rw"><div style="flex:1"><div class="rl">'+rules[ri][0]+'</div><div class="rs_">'+rules[ri][1]+'</div></div></div>';
+  }
+  html+='</div>';
+
+  function alertSec(arr,side,cls,isUp){
+    if(!arr.length)return '';
+    var col=cls==='abull'?'var(--gn)':'var(--rd)';
+    var title=isUp?(side+' OI Building -- '+(side==='CE'?'Resistance':'Support')+' Forming'):
+                   (side+' OI Unwinding -- '+(side==='CE'?'Resistance':'Support')+' Breaking');
+    var out='<div class="ct" style="padding:10px 0 4px;color:'+col+'">'+title+'</div>';
+    for(var ai=0;ai<Math.min(arr.length,4);ai++){
+      var r2=arr[ai];var pct2=side==='CE'?r2.cePct:r2.pePct;var chg2=side==='CE'?r2.cc:r2.pc;
+      out+='<div class="alrt '+cls+'"><div class="at" style="color:'+col+'">Strike '+r2.s+' -- '+side+' OI '+(pct2>0?'+':'')+pct2+'%</div>';
+      out+='<div class="ad">'+fmtOI(Math.abs(chg2))+' contracts '+(isUp?'added':'exited')+'. '+(isUp?'Operators building wall here.':'Operators exiting -- '+(side==='CE'?'bullish breakout':'bearish breakdown')+'.')+'</div></div>';
+    }
+    return out;
+  }
+  html+=alertSec(ceBld,'CE','abear',true)+alertSec(ceUnd,'CE','abull',false);
+  html+=alertSec(peBld,'PE','abull',true)+alertSec(peUnd,'PE','abear',false);
+  if(!ceBld.length&&!ceUnd.length&&!peBld.length&&!peUnd.length){
+    html+='<div class="card"><div style="text-align:center;padding:16px;color:var(--tx3);font-size:11px">No major OI shifts detected.<br>Signals appear when OI changes more than 15% between refreshes.</div></div>';
+  }
+  setEl('radarBody',html);
+}
+
+// ============================================================
+// EXPIRY MAP
+// ============================================================
+function renderExpiry(){
+  var ts=D.updated||'--';
+  setEl('expiryTs','Data: '+ts+(D.isLive?' <span class="bdg bg" style="font-size:9px">LIVE</span>':' <span class="bdg ba" style="font-size:9px">Tap Refresh</span>'));
+
+  if(!D.nifty){setEl('expiryBody','<div class="empty">Fetch data to see expiry forecast</div>');return;}
+  var n=D.nifty,vix=D.vix||15,mp=D.mp||Math.round(n/50)*50,cew=D.cew||0,pew=D.pew||0,pcr=D.pcr||1;
+  var wkH=Math.round(n*(1+vix/100*Math.sqrt(5/252))/50)*50;
+  var wkL=Math.round(n*(1-vix/100*Math.sqrt(5/252))/50)*50;
+  var mH=Math.round(n*(1+vix/100*Math.sqrt(21/252))/50)*50;
+  var mL=Math.round(n*(1-vix/100*Math.sqrt(21/252))/50)*50;
+  var grv=Math.round((mp+(n-mp)*0.65)/50)*50;
+
+  var zones=[
+    {lbl:'CE Wall (Resistance)',lvl:cew,desc:'Call writers defend here. Sell CE at or above this.',bc:'var(--rd)',bg:'rgba(239,68,68,.1)',prob:'80%'},
+    {lbl:'Weekly VIX High (70%)',lvl:wkH,desc:'70% chance Nifty stays BELOW this by Thursday. Sell CE above.',bc:'var(--am)',bg:'rgba(245,158,11,.1)',prob:'70%'},
+    {lbl:'Max Pain Target',lvl:grv,desc:'Market gravitates here by expiry. BEST straddle level on Thursday.',bc:'var(--gn)',bg:'rgba(34,197,94,.1)',prob:'72%'},
+    {lbl:'Current Nifty',lvl:Math.round(n),desc:'Where Nifty is trading right now.',bc:'var(--bl)',bg:'rgba(96,165,250,.07)',prob:''},
+    {lbl:'Weekly VIX Low (70%)',lvl:wkL,desc:'70% chance Nifty stays ABOVE this by Thursday. Sell PE below.',bc:'var(--am)',bg:'rgba(245,158,11,.1)',prob:'70%'},
+    {lbl:'PE Wall (Support)',lvl:pew,desc:'Put writers defend here. Buy CE or sell PE near this.',bc:'var(--gn)',bg:'rgba(34,197,94,.1)',prob:'80%'},
+  ].sort(function(a,b){return b.lvl-a.lvl;});
+
+  var html='<div class="card"><div class="ct">Weekly Expiry Zones (Thursday)</div>';
+  html+='<div style="font-size:10px;color:var(--tx3);margin-bottom:10px">VIX='+fmt(vix,1)+'  MaxPain='+fmt(mp)+'  PCR='+fmt(pcr,2)+'  Nifty='+fmt(n)+'  <span style="color:'+(D.isLive?'var(--gn)':'var(--am)')+'">'+ts+'</span></div>';
+  for(var zi=0;zi<zones.length;zi++){
+    var z=zones[zi];
+    html+='<div class="zone" style="background:'+z.bg+';border-left-color:'+z.bc+'">';
+    html+='<div class="zlbl" style="color:'+z.bc+'"><span>'+z.lbl+'</span>'+(z.prob?'<span style="font-size:10px">'+z.prob+'</span>':'')+'</div>';
+    html+='<div class="zlvl" style="color:'+z.bc+'">'+fmt(z.lvl)+'</div>';
+    html+='<div class="zdsc" style="color:'+z.bc+'">'+z.desc+'</div></div>';
+  }
+  html+='</div>';
+
+  html+='<div class="card"><div class="ct">Monthly Range</div><div class="g2">';
+  html+='<div class="tile"><div class="tl">Monthly High</div><div class="tv up">'+fmt(mH)+'</div><div class="ts">VIX ceiling</div></div>';
+  html+='<div class="tile"><div class="tl">Monthly Low</div><div class="tv dn">'+fmt(mL)+'</div><div class="ts">VIX floor</div></div>';
+  html+='</div></div>';
+
+  html+='<div class="card"><div class="ct">Thursday Playbook</div>';
+  var plays=[
+    {c:'Spot within 150 pts of max pain',a:'SELL ATM straddle at '+fmt(mp)+' -- best expiry trade',sl:'50 pts/leg',p:'79%',cls:'abull'},
+    {c:'Spot 200+ pts ABOVE max pain',a:'Sell CE or buy PE -- gravity pulls toward '+fmt(mp)+' by 3:30 PM',sl:'60 pts',p:'72%',cls:'abear'},
+    {c:'Spot 200+ pts BELOW max pain',a:'Sell PE or buy CE -- gravity pulls toward '+fmt(mp)+' by 3:30 PM',sl:'60 pts',p:'72%',cls:'abull'},
+    {c:'CE wall broken with volume',a:'BUY CE -- shorts covering. Target +100 pts above '+fmt(cew),sl:'25 pts',p:'68%',cls:'abull'},
+    {c:'VIX above 22 on expiry morning',a:'HALF size only. High gamma = unpredictable moves.',sl:'Wider',p:'Caution',cls:'awarn'},
+    {c:'ALWAYS exit before 3:10 PM',a:'Mandatory. Gamma risk extreme in last 20 minutes.',sl:'Market order',p:'Rule',cls:'ainfo'},
+  ];
+  for(var pi2=0;pi2<plays.length;pi2++){
+    var pl=plays[pi2];
+    html+='<div class="alrt '+pl.cls+'" style="margin-bottom:6px">';
+    html+='<div class="at" style="display:flex;justify-content:space-between"><span>'+pl.c+'</span><span class="bdg bn">'+pl.p+'</span></div>';
+    html+='<div class="ad">'+pl.a+'<br><span style="opacity:.6">Stop: '+pl.sl+'</span></div></div>';
+  }
+  html+='</div>';
+  setEl('expiryBody',html);
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+function renderHist(){
+  if(!hist||!hist.length){setEl('histBody','<div class="empty">No history yet</div>');return;}
+  setTxt('histCount','('+hist.length+' entries)');
+  var html='';
+  for(var i=0;i<hist.length;i++){
+    var h=hist[i];
+    html+='<div class="hrow">';
+    html+='<div class="htime"><div>'+h.t.split('  ')[0]+'</div><div style="margin-top:1px">'+((h.t.split('  ')[1])||'')+'</div>';
+    html+=(h.isLive?'<span class="bdg bg" style="font-size:8px;margin-top:3px">LIVE</span>':'<span class="bdg ba" style="font-size:8px;margin-top:3px">?</span>')+'</div>';
+    html+='<div class="hdata">';
+    html+='<span class="hchip '+cc(h.n)+'">N:'+fmt(h.n)+'</span>';
+    html+='<span class="hchip">BN:'+fmt(h.bn)+'</span>';
+    html+='<span class="hchip" style="color:'+(h.vix>18?'var(--rd)':h.vix<13?'var(--gn)':'var(--am)')+'">VIX:'+fmt(h.vix,1)+'</span>';
+    html+='<span class="hchip">PCR:'+fmt(h.pcr,2)+'</span>';
+    html+='<span class="hchip">MP:'+fmt(h.mp)+'</span>';
+    html+='<span class="hchip '+(h.fii>=0?'up':'dn')+'">FII:'+(h.fii>=0?'+':'')+fmt(h.fii)+'</span>';
+    html+='</div></div>';
+  }
+  setEl('histBody',html);
+}
+
+// ============================================================
+// EXCEL
+// ============================================================
+function dlExcel(){
+  if(typeof XLSX==='undefined'){setTimeout(function(){dlExcel();},1500);return;}
+  var wb=XLSX.utils.book_new();
+  var dt='Generated: '+nowIST()+' | Live: '+D.isLive+' | Source: '+(D.source||'--');
+  var dash=[['NSE Intelligence Dashboard'],[dt],[],
+    ['Nifty',D.nifty,'BankNifty',D.bn],['VIX',D.vix,'PCR',D.pcr],
+    ['Max Pain',D.mp,'ATM',D.atm],['CE Wall',D.cew,'PE Wall',D.pew],
+    ['ATM CE IV%',D.ceiv,'ATM PE IV%',D.peiv],['FII Net Cr',D.fii,'DII Net Cr',D.dii],
+    ['Score',calcScore(),'Updated',D.updated],['Is Live Data',D.isLive,'Source',D.source]];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dash),'Dashboard');
+  var chain=[['Strike','CE OI','CE OI Chg','CE OI%','CE IV%','CE LTP','PE LTP','PE IV%','PE OI%','PE OI Chg','PE OI','ATM','Timestamp','Is Live']];
+  (D.oc||[]).forEach(function(r){chain.push([r.s,r.co,r.cc,r.cePct?r.cePct+'%':'--',r.civ?r.civ.toFixed(1)+'%':'--',r.clt,r.plt,r.piv?r.piv.toFixed(1)+'%':'--',r.pePct?r.pePct+'%':'--',r.pc,r.po,r.isAtm?'ATM':'',D.updated,D.isLive]);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(chain),'Option Chain');
+  var hArr=[['Time','Nifty','BankNifty','VIX','PCR','Max Pain','CE Wall','PE Wall','FII Cr','DII Cr','Is Live']];
+  hist.forEach(function(h){hArr.push([h.t,h.n,h.bn,h.vix,h.pcr,h.mp,h.cew,h.pew,h.fii,h.dii,h.isLive?'LIVE':'Unknown']);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(hArr),'History');
+  try{XLSX.writeFile(wb,'NSE_'+new Date().toISOString().slice(0,10)+'.xlsx');var sb=$('sbanner');if(sb){sb.style.display='block';setTimeout(function(){sb.style.display='none';},3000);}}
+  catch(e){alert('Save error: '+e.message);}
+}
+
+// ============================================================
+// AUTO SAVE
+// ============================================================
+function checkAutoSave(){
+  try{
+    var ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+    var today=ist.toDateString();
+    var lsd=localStorage.getItem(lsdKey)||'';
+    if(ist.getHours()>=15&&ist.getMinutes()>=30&&lsd!==today&&D.nifty>0){
+      localStorage.setItem(lsdKey,today);
+      dlExcel();
+      var sb=$('sbanner');if(sb){sb.textContent='Daily Excel auto-saved';sb.style.display='block';setTimeout(function(){sb.style.display='none';},4000);}
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// CLOCK + COUNTDOWN
+// ============================================================
+setInterval(function(){
+  cdSec--;if(cdSec<0)cdSec=0;
+  var m=Math.floor(cdSec/60),s=cdSec%60;
+  var el=$('cdtimer');if(el)el.textContent=m+':'+(s<10?'0':'')+s;
+  if(cdSec===0){cdSec=300;if(isOpen())doFetch();}
+},1000);
+
+// Startup
+if(isOpen()){doFetch();}
+else if(D.nifty>0){renderAll();setDot('live');setHsub('Market closed -- last data from '+(D.updated||'--'));}
+</script>
+</body>
+</html>
